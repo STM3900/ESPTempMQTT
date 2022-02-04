@@ -6,15 +6,16 @@
 #include <WiFiUdp.h>
 #include <PubSubClient.h>
 
-const char *ssid = "DevStation";     // Enter your WiFi name
-const char *password = "import_dev"; // Enter WiFi password
-const char *mqttServer = "192.168.213.14";
+const char *ssid = "";       // Enter your WiFi name
+const char *password = "";   // Enter WiFi password
+const char *mqttServer = ""; // mqttServer Ip
 const int mqttPort = 1883;
 
+// Initialisation du module Wifi et du service PubSub
 WiFiClient espClient;
 PubSubClient client(espClient);
 
-#define ONE_WIRE_BUS 4
+#define ONE_WIRE_BUS 4 // Le pin ou le capteur de température est branché (D4 du coup)
 
 // Setup a oneWire instance to communicate with any OneWire devices
 OneWire oneWire(ONE_WIRE_BUS);
@@ -22,6 +23,7 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature sensor
 DallasTemperature sensors(&oneWire);
 
+// Fonction de callback : est utile si l'on est subscribed à un topic et se déclanche quand on reçoit un message
 void callback(char *topic, byte *payload, unsigned int length)
 {
 
@@ -38,11 +40,14 @@ void setup(void)
 {
   // Start serial communication for debugging purposes
   Serial.begin(9600);
+
   // Start up the library
   sensors.begin();
 
+  // Initialisation du wifi
   WiFi.begin(ssid, password);
 
+  // Reste dans cette boucle tant que l'on n'est pas connecté au wifi
   while (WiFi.status() != WL_CONNECTED)
   {
     delay(500);
@@ -50,9 +55,11 @@ void setup(void)
   }
   Serial.println("Connected to the WiFi network");
 
+  // Initialisation de l'instance vers le serveur mqtt
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback);
 
+  //Tant qu'on est pas connecté au mqtt, on essaie
   while (!client.connected())
   {
     Serial.println("Connecting to MQTT...");
@@ -74,25 +81,20 @@ void setup(void)
 void loop(void)
 {
 
+  // Ecoute en permanance le mqtt
   client.loop();
 
+  // récupère la température
   sensors.requestTemperatures();
   double num = sensors.getTempCByIndex(0);
   char text[20];
 
+  // converti la température en string
   sprintf(text, "%f", num);
 
+  // publish dans le topic temp la température
   client.publish("temp", text);
 
+  // On attend 10 secondes avant de recommencer
   delay(10000);
-
-  /*
-  sensors.requestTemperatures();
-
-  Serial.print("Celsius temperature: ");
-
-  Serial.print(sensors.getTempCByIndex(0));
-  Serial.print(" - Fahrenheit temperature: ");
-  Serial.println(sensors.getTempFByIndex(0));
-  */
 }
